@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Love, I Have Something to Ask</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Pacifico&display=swap" rel="stylesheet">
+
+<style>
+  :root{--bg:#050008;--fg:#fff;--card:rgba(20,10,30,.88);--accent:#ff5a8f;--soft:#ffcad4;box-sizing:border-box}
+  *{margin:0;padding:0;box-sizing:inherit}
+  html,body{height:100%;background:var(--bg);color:var(--fg);overflow:hidden;font-family:'Outfit',system-ui,sans-serif}
+  #canvas{position:fixed;inset:0;width:100%;height:100%;z-index:1;touch-action:none}
+  .overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);background:rgba(5,0,8,.35);transition:opacity .3s}
+  .overlay.hidden{opacity:0;pointer-events:none}
+  .card{background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,150,200,.35);border-radius:28px;padding:30px 26px;text-align:center;max-width:360px;width:90%;box-shadow:0 0 60px rgba(255,60,130,.35);animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{0%{transform:scale(.4) rotate(-4deg);opacity:0}100%{transform:scale(1);opacity:1}}
+  .card h1{font-family:'Pacifico',cursive;font-size:28px;color:var(--soft);line-height:1.3}
+  .card .emoji{font-size:54px;display:inline-block;animation:float 2.4s ease-in-out infinite}
+  @keyframes float{50%{transform:translateY(-8px) scale(1.08)}}
+  .card p{opacity:.85;font-size:15px;line-height:1.6;margin:12px 0}
+  .btn{background:linear-gradient(90deg,#ff5a8f,#ff8fab);border:0;padding:11px 26px;border-radius:100px;color:#fff;font:700 15px 'Outfit',sans-serif;cursor:pointer;margin-top:8px;box-shadow:0 6px 20px rgba(255,90,143,.45)}
+  .btn:active{transform:scale(.96)}
+  #tip{position:fixed;z-index:6;pointer-events:none;background:rgba(255,90,143,.9);padding:4px 10px;border-radius:99px;font-size:12px;transform:translate(14px,14px);display:none}
+  .heartfx{position:fixed;z-index:11;pointer-events:none;font-size:22px;animation:rise 1.6s ease-out forwards}
+  @keyframes rise{to{transform:translateY(-160px) scale(1.4);opacity:0}}
+  #musicBtn{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:5;background:rgba(0,0,0,.55);border:0;color:#fff;width:42px;height:42px;border-radius:50%;font-size:18px;cursor:pointer;display:none}
+  .lil-gui.root{z-index:8 !important;--background-color:#141020;--widget-color:#2a203a;--title-background-color:#ff5a8f}
+</style>
+
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="tip">Tap me 💌</div>
+<audio id="loveTrack" src="song.mp3" loop preload="auto"></audio>
+<button id="musicBtn" title="Mute / unmute music">🔊</button>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <div class="emoji">💖🌌</div>
+    <h1 id="introTitle">My Love, I Have<br>Something to Ask…</h1>
+    <p>I made a little universe just for you. Drag to turn it, pinch or scroll to zoom, and tap the glowing words. ❤️</p>
+    <button class="btn" id="enterBtn">Enter Our Universe ✨</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="msg">
+  <div class="card">
+    <div class="emoji" id="mEmoji">💌</div>
+    <h1 id="mTitle"></h1>
+    <p id="mText"></p>
+    <button class="btn" id="closeBtn">Close 💗</button>
+  </div>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.umd.min.js"></script>
+<script>
+
+
+const HER_NAME = "";
+
+const NAME = HER_NAME.trim() || "My Love";
+
+if (HER_NAME.trim()) {
+  document.getElementById('introTitle').innerHTML =
+    NAME + ", I Have<br>Something to Ask…";
+  document.title = NAME + ", I Have Something to Ask";
+}
+
+
+
+const canvas = document.getElementById('canvas');
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x050008, 25, 90);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(0, 9, 26);
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor('#050008');
+
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 4;
+controls.maxDistance = 70;
+controls.zoomSpeed = 1.2;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.4;
+
+const params = {
+  galaxySpeed:0.3, spiralTightness:0.2, galaxyRadius:18,
+  heartSize:0.6, heartCount:1200, heartSpreadY:3.0, heartFormation:0.0,
+  blackHoleSize:0.6, ringSize:1.5, ringOpacity:0.8, ringRotation:2.0,
+  textSpeed:0.3, textRadius:14,
+  particleColor:'#ff5a8f', backgroundColor:'#050008',
+  autoRotate:true, showTexts:true
+};
+
+scene.add(new THREE.AmbientLight(0xffc0dd, 0.6));
+const pLight = new THREE.PointLight(0xff2a7a, 4, 60);
+scene.add(pLight);
+
+// Black hole 
+const core = new THREE.Mesh(new THREE.SphereGeometry(0.6,32,32), new THREE.MeshBasicMaterial({color:0x000000}));
+scene.add(core);
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.8,1.5,64), new THREE.MeshBasicMaterial({color:0xff2a7a, side:THREE.DoubleSide, transparent:true, opacity:0.8}));
+ring.rotation.x = Math.PI/2;
+scene.add(ring);
+
+// Starfield
+(function(){
+  const n = 1500, pos = new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const r = 40 + Math.random()*80, a = Math.random()*Math.PI*2, b = Math.acos(2*Math.random()-1);
+    pos[i*3] = r*Math.sin(b)*Math.cos(a); pos[i*3+1] = r*Math.cos(b); pos[i*3+2] = r*Math.sin(b)*Math.sin(a);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({color:0xffd6e5, size:0.35, transparent:true, opacity:0.7})));
+})();
+
+// Hearts
+function createHeartGeo(s){
+  const sh = new THREE.Shape();
+  sh.moveTo(0, -1.2*s);
+  sh.bezierCurveTo(-2.2*s, 0.3*s, -1.4*s, 1.6*s, 0, 0.7*s);
+  sh.bezierCurveTo(1.4*s, 1.6*s, 2.2*s, 0.3*s, 0, -1.2*s);
+  return new THREE.ShapeGeometry(sh);
+}
+const heartGeo = createHeartGeo(0.15);
+const heartGroup = new THREE.Group();
+scene.add(heartGroup);
+let hearts = [];
+
+function createHearts(){
+  hearts.forEach(h=>h.material.dispose());
+  heartGroup.clear(); hearts = [];
+  for(let i=0;i<params.heartCount;i++){
+    const mat = new THREE.MeshBasicMaterial({transparent:true, side:THREE.DoubleSide});
+    mat.color.setHSL(0.92 + Math.random()*0.12, 0.85, 0.6 + Math.random()*0.25);
+    const m = new THREE.Mesh(heartGeo, mat);
+    m.userData = {
+      radius: 2 + Math.random()*params.galaxyRadius,
+      angle: Math.random()*Math.PI*2,
+      yOffset: (Math.random()-0.5)*params.heartSpreadY,
+      speed: 0.2 + Math.random()*0.8,
+      baseScale: 0.3 + Math.random()*1.0
+    };
+    heartGroup.add(m); hearts.push(m);
+  }
+}
+createHearts();
+
+
+const words = [
+  {
+    t:'I LOVE YOU, ' + NAME.toUpperCase(),
+    e:'💗',
+    title:'I Love You, ' + NAME,
+    text:"I don't always find the perfect words, but I want you to know how much you mean to me. Every star in this galaxy is a small reason why I love you."
+  },
+  {
+    t:'YOU ARE MY HAPPINESS',
+    e:'🥰',
+    title:'You Are My Happiness',
+    text:"Your smile is my favourite thing in the world. Even the smallest moments with you turn into my best memories. I am so lucky to know you."
+  },
+  {
+    t:'YOU ARE MY WORLD',
+    e:'🌍',
+    title:'You Are My World',
+    text:"When I think about my future, you are the one I see in it. You make every ordinary day feel better, and I never want to take that for granted."
+  },
+  {
+    t:'MY HAND IS YOURS',
+    e:'🤝',
+    title:'Stay By My Side',
+    text:"I want to hold your hand, laugh at silly things with you, back your dreams, and stay with you on the hard days too. I want us to grow together."
+  },
+  {
+    t:'ONLY YOU, ALWAYS',
+    e:'💍',
+    title:'Only You, Always',
+    text:"I don't need a perfect love story, just a real one with you. Through every smile and every challenge, I choose you."
+  },
+  {
+    t:'WILL YOU BE MY BOY?',
+    e:'💌',
+    title:'One Little Question...',
+    text:"I have something to ask you, " + NAME + ". Will you be my boy and let me make beautiful memories with you? I promise to do my best to make you smile every single day.",
+    btn:"Yes, I'm yours 💖",
+    final:true
+  }
+];
+
+// Shown after she taps YES
+const yesCard = {
+  e:'🥳',
+  title:'You Said Yes!',
+  text:"You just made me the happiest person in the whole universe. I love you, " + NAME + ". Forever starts now. 💞",
+  btn:"Forever 💞"
+};
+
+
+
+// 3D TEXT SPRITES
+
+const textSprites = [];
+
+function makeTextSprite(w){
+  const c = document.createElement('canvas');
+  c.width = 640; c.height = 140;
+  const ctx = c.getContext('2d');
+  let size = 52;
+  ctx.font = `bold ${size}px Outfit, sans-serif`;
+  while(ctx.measureText(w.t).width > 590 && size > 20){ size -= 2; ctx.font = `bold ${size}px Outfit, sans-serif`; }
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffb3c9';
+  ctx.shadowColor = '#ff2a7a'; ctx.shadowBlur = 22;
+  ctx.fillText(w.t, 320, 85);
+  ctx.fillText(w.t, 320, 85);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false});
+  const s = new THREE.Sprite(mat);
+  s.scale.set(7.5, 1.64, 1);
+  s.userData = {word:w, radius:8 + Math.random()*10, angle:Math.random()*Math.PI*2, y:(Math.random()-0.5)*5, speed:0.3 + Math.random()*0.4, hover:false};
+  scene.add(s); textSprites.push(s);
+}
+(document.fonts && document.fonts.load ? document.fonts.load('bold 40px Outfit') : Promise.resolve())
+  .catch(()=>{}).then(()=>words.forEach(makeTextSprite));
+
+
+
+if(window.lil){
+  const gui = new lil.GUI({title:'🌌 Galaxy Control'});
+  gui.close();
+  const f1 = gui.addFolder('Galaxy Motion');
+  f1.add(params,'galaxySpeed',0,2,0.01).name('Speed');
+  f1.add(params,'spiralTightness',0,1,0.01).name('Spiral');
+  f1.add(params,'autoRotate').name('Auto Rotate').onChange(v=>controls.autoRotate=v);
+  const f2 = gui.addFolder('Hearts');
+  f2.add(params,'heartCount',200,3000,100).name('Count').onFinishChange(createHearts);
+  f2.add(params,'galaxyRadius',5,35,1).name('Radius').onChange(()=>hearts.forEach(h=>h.userData.radius=2+Math.random()*params.galaxyRadius));
+  f2.add(params,'heartSize',0.1,2,0.05).name('Heart Size');
+  f2.add(params,'heartSpreadY',0,10,0.1).name('Y Spread').onChange(()=>hearts.forEach(h=>h.userData.yOffset=(Math.random()-0.5)*params.heartSpreadY));
+  f2.add(params,'heartFormation',0,1,0.01).name('Galaxy ↔️ Heart');
+  f2.addColor(params,'particleColor').name('Color').onChange(v=>hearts.forEach(h=>h.material.color.set(v)));
+  const f3 = gui.addFolder('Black Hole');
+  f3.add(params,'blackHoleSize',0.1,3,0.05).name('Core Size');
+  f3.add(params,'ringSize',0.5,5,0.1).name('Ring Size').onChange(v=>ring.scale.setScalar(v/1.5));
+  f3.add(params,'ringOpacity',0,1,0.01).name('Ring Opacity').onChange(v=>ring.material.opacity=v);
+  f3.add(params,'ringRotation',0,5,0.1).name('Ring Spin');
+  const f4 = gui.addFolder('Words');
+  f4.add(params,'textSpeed',0,2,0.01).name('Orbit Speed');
+  f4.add(params,'textRadius',5,30,1).name('Orbit Radius');
+  f4.add(params,'showTexts').name('Show Words').onChange(v=>textSprites.forEach(s=>s.visible=v));
+  gui.addColor(params,'backgroundColor').name('Bg Color');
+  addEventListener('keydown',e=>{ if(e.key.toLowerCase()==='h') gui._hidden ? gui.show() : gui.hide(); });
+}
+
+
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+const tip = document.getElementById('tip');
+let hovered = null, down = null, cardOpen = false, started = false, currentWord = null;
+
+function pick(x, y){
+  mouse.set((x/innerWidth)*2-1, -(y/innerHeight)*2+1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(textSprites.filter(s=>s.visible))[0];
+  return hit ? hit.object : null;
+}
+canvas.addEventListener('pointermove', e=>{
+  if(cardOpen) return;
+  const h = pick(e.clientX, e.clientY);
+  if(hovered && hovered!==h) hovered.userData.hover = false;
+  hovered = h;
+  if(h){ h.userData.hover = true; canvas.style.cursor='pointer'; tip.style.display='block'; tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; }
+  else { canvas.style.cursor='grab'; tip.style.display='none'; }
+});
+canvas.addEventListener('pointerdown', e=>{ down = {x:e.clientX, y:e.clientY}; canvas.style.cursor='grabbing'; });
+canvas.addEventListener('pointerup', e=>{
+  if(!down || !started) return;
+  const moved = Math.hypot(e.clientX-down.x, e.clientY-down.y);
+  down = null;
+  if(moved > 6) return;
+  const h = pick(e.clientX, e.clientY);
+  if(h) openCard(h.userData.word, e.clientX, e.clientY);
+});
+
+
+
+const msg = document.getElementById('msg');
+
+function floatHearts(count, x, y, spread){
+  for(let i=0;i<count;i++){
+    const f = document.createElement('div');
+    f.className = 'heartfx';
+    f.textContent = ['💖','💗','💕','✨'][i%4];
+    f.style.left = (x + (Math.random()-0.5)*spread) + 'px';
+    f.style.top = y + 'px';
+    f.style.animationDelay = (i*0.06) + 's';
+    document.body.appendChild(f);
+    setTimeout(()=>f.remove(), 2600);
+  }
+}
+
+function openCard(w, x, y){
+  currentWord = w;
+  document.getElementById('mEmoji').textContent = w.e;
+  document.getElementById('mTitle').textContent = w.title;
+  document.getElementById('mText').textContent = w.text;
+  document.getElementById('closeBtn').textContent = w.btn || 'Close 💗';
+  msg.classList.remove('hidden');
+  cardOpen = true; tip.style.display = 'none';
+  floatHearts(8, x, y, 120);
+}
+
+function closeCard(){ msg.classList.add('hidden'); cardOpen = false; }
+
+document.getElementById('closeBtn').onclick = ()=>{
+  const wasFinal = currentWord && currentWord.final;
+  closeCard();
+
+  if(wasFinal){
+    // Galaxy morphs into one big heart
+    params.heartFormation = 1;
+    // Hearts float up across the screen
+    for(let i=0;i<24;i++){
+      floatHearts(1, Math.random()*innerWidth, innerHeight*(0.6 + Math.random()*0.3), 0);
+    }
+    // Then a "she said yes" card
+    setTimeout(()=>openCard(yesCard, innerWidth/2, innerHeight/2), 1400);
+  }
+};
+
+msg.addEventListener('click', e=>{ if(e.target===msg) closeCard(); });
+addEventListener('keydown', e=>{ if(e.key==='Escape') closeCard(); });
+
+
+
+let time = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  time += 0.01;
+  controls.autoRotate = started && params.autoRotate && !cardOpen && !hovered;
+  controls.update();
+  renderer.setClearColor(params.backgroundColor);
+  core.scale.setScalar(params.blackHoleSize/0.6 + Math.sin(time*2)*0.05);
+  ring.rotation.z += params.ringRotation*0.01;
+  pLight.intensity = 4 + Math.sin(time*3)*0.8;
+  hearts.forEach(h=>{
+    const d = h.userData;
+    d.angle += d.speed*0.005*params.galaxySpeed;
+    const r = d.radius, a = d.angle + time*params.spiralTightness*(20/r);
+    const gx = Math.cos(a)*r*0.9, gz = Math.sin(a)*r*0.9;
+    const gy = d.yOffset + Math.sin(time+d.angle)*0.3;
+    const t = d.angle;
+    const hx = 16*Math.pow(Math.sin(t),3)*0.5;
+    const hy = (13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t))*0.4;
+    h.position.x = THREE.MathUtils.lerp(gx, hx, params.heartFormation);
+    h.position.z = THREE.MathUtils.lerp(gz, 0, params.heartFormation);
+    h.position.y = THREE.MathUtils.lerp(gy, hy, params.heartFormation);
+    h.quaternion.copy(camera.quaternion);
+    h.scale.setScalar(d.baseScale*params.heartSize*(0.8 + Math.sin(time*2+d.angle)*0.2));
+  });
+  textSprites.forEach(s=>{
+    const d = s.userData;
+    if(started && !d.hover && !cardOpen) d.angle += d.speed*0.008*params.textSpeed;
+    s.position.set(Math.cos(d.angle)*params.textRadius, d.y, Math.sin(d.angle)*params.textRadius);
+    const k = d.hover ? 1.15 : 1;
+    s.scale.x += (7.5*k - s.scale.x)*0.15;
+    s.scale.y += (1.64*k - s.scale.y)*0.15;
+  });
+  renderer.render(scene, camera);
+}
+animate();
+
+
+let audioCtx, master, musicTimer, muted = false;
+const loveTrack = document.getElementById('loveTrack');
+const musicBtn = document.getElementById('musicBtn');
+
+function startFallbackMusic(){
+  if(audioCtx) return;
+  try{
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    master = audioCtx.createGain();
+    master.gain.value = 0.18;
+    master.connect(audioCtx.destination);
+    const chords = [[261.63,329.63,392],[220,261.63,329.63],[174.61,220,261.63],[196,246.94,293.66]];
+    const pattern = [0,1,2,1,2,1];
+    let step = 0;
+
+    const note = (f, t, dur)=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.5, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur);
+    };
+    musicTimer = setInterval(()=>{
+      const c = chords[Math.floor(step/6) % 4];
+      const t = audioCtx.currentTime + 0.05;
+      if(step % 6 === 0) note(c[0]/2, t, 2.4);
+      note(c[pattern[step % 6]] * 2, t, 0.9);
+      step++;
+    }, 450);
+
+    musicBtn.style.display = 'block';
+    musicBtn.onclick = ()=>{
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 0.18;
+      musicBtn.textContent = muted ? '🔇' : '🔊';
+    };
+  }catch(err){ console.warn('Audio unavailable', err); }
+}
+
+async function startMusic(){
+  try {
+    loveTrack.volume = 0.4;
+    loveTrack.muted = false;
+    await loveTrack.play();
+    musicBtn.style.display = 'block';
+    musicBtn.onclick = ()=>{
+      muted = !muted;
+      loveTrack.muted = muted;
+      musicBtn.textContent = muted ? '🔇' : '🔊';
+    };
+    musicBtn.textContent = '🔊';
+  } catch (err) {
+    console.warn('Song playback failed, using fallback music', err);
+    startFallbackMusic();
+  }
+}
+
+document.getElementById('enterBtn').onclick = async ()=>{
+  document.getElementById('intro').classList.add('hidden');
+  started = true;
+  await startMusic();
+};
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
